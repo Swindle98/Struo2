@@ -1,5 +1,5 @@
 #-- email notifications of pipeline success/failure (use "Skip" to deactivate) --#
-email: None
+email: skip
 
 #-- databases to update --#
 # Replace "Create" with "Skip" to skip creation of any of these
@@ -7,9 +7,9 @@ email: None
 databases:
   kraken2: Create
   bracken: Create
-  genes: Create
-  humann3_bowtie2: Create
-  humann3_diamond: Create
+  genes: skip
+  humann3_bowtie2: skip
+  humann3_diamond: skip
 
 #-- Input --#
 #--- If just a set of gene sequences to add ---#
@@ -84,6 +84,9 @@ keep_intermediate: True
 # for humann3::mmseqs_search::run, --num-iterations must be >=2
 params:
   ionice: -c 3
+  kraken2:
+    # cap on the hash table size (bytes); use "Skip" for no cap (uses kraken2-build's full capacity estimate)
+    max_db_size: Skip
   bracken:
     build_kmer: 35
     build_read_lens:

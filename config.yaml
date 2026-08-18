@@ -1,22 +1,22 @@
 #-- email notifications of pipeline success/failure (use "Skip" to deactivate) --#
-email: None
+email: skip
 
 #-- I/O --#
 # file listing samples and associated data
-samples_file: data/GTDBr95_n10/GTDBr95_n10.tsv
+samples_file: r232/filtered_metadata_with_taxids_and_paths.tsv
 
 ## column names in samples table
 samples_col: 'ncbi_organism_name'
 accession_col: 'accession'
-fasta_file_path_col: 'fasta_file_path'
+fasta_file_path_col: 'path'
 taxID_col: 'gtdb_taxid'          # or 'ncbi_species_taxid'
 taxonomy_col: 'gtdb_taxonomy'    # or 'ncbi_taxonomy' 
 
 # output location
-output_dir: tests/output/GTDBr95_n10/
+output_dir: r232/checkm50_no_rumen/
 
 # temporary file directory (your username will be added automatically)
-tmp_dir: /ebio/abt3_scratch/
+tmp_dir: tmp/
 
 #-- databases to create --#
 # Replace "Create" with "Skip" to skip creation of any of these
@@ -24,9 +24,9 @@ tmp_dir: /ebio/abt3_scratch/
 databases:
   kraken2: Create
   bracken: Create
-  genes: Create
-  humann3_bowtie2: Create
-  humann3_diamond: Create
+  genes: skip
+  humann3_bowtie2: skip
+  humann3_diamond: skip
 
 # Name of UniRef clustering (uniref90 or uniref50)
 ## "uniref90" highly recommended
@@ -40,8 +40,8 @@ cluster_idx: data/uniref50-90.pkl
 
 #-- if custom NCBI/GTDB taxdump files, "Skip" if standard NCBI taxdump --#
 # Used for kraken taxonomy & metaphlan
-names_dmp: data/taxdump/names.dmp
-nodes_dmp: data/taxdump/nodes.dmp
+names_dmp: r232/names.dmp
+nodes_dmp: r232/nodes.dmp
 
 #-- keep intermediate files required for re-creating DBs (eg., w/ more genomes) --#
 # If "True", the intermediate files are saved to `output_dir`
@@ -55,6 +55,9 @@ keep_intermediate: True
 # for humann3::mmseqs_search::run, --num-iterations must be >=2
 params:
   ionice: -c 3
+  kraken2:
+    # cap on the hash table size (bytes); use "Skip" for no cap (uses kraken2-build's full capacity estimate)
+    max_db_size: 200000000000
   bracken:
     build_kmer: 35
     build_read_lens:
