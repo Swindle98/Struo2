@@ -111,6 +111,9 @@ rule kraken2_build:
         opts = temp(config['tmp_dir'] + 'db_update/kraken2/opts.k2d'),
         map  = temp(config['tmp_dir'] + 'db_update/kraken2/seqid2taxid.map'),
         taxo = temp(config['tmp_dir'] + 'db_update/kraken2/taxo.k2d')
+    params:
+        max_db_size = lambda wildcards: '' if skipped(config['params'].get('kraken2', {}).get('max_db_size', 'Skip')) \
+          else '--max-db-size ' + str(config['params']['kraken2']['max_db_size'])
     threads:
         12
     resources:
@@ -126,7 +129,7 @@ rule kraken2_build:
     shell:
         """
         DB=`dirname {output.hash}`
-        kraken2-build --build --threads {threads} --db $DB 2> {log} 1>&2
+        kraken2-build --build --threads {threads} {params.max_db_size} --db $DB 2> {log} 1>&2
         """
     
 rule kraken2_db_copy:

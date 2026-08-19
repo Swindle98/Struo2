@@ -1,11 +1,47 @@
-rule bracken_build:
+rule bracken_build_db_kraken:
     """
-    Build braken database(s) from kraken2 database.
-    One database to user-selected read lengths.
+    Build the shared database.kraken file (kraken2 classification of the full
+    library). This is the memory-intensive step, and it is shared by every
+    bracken read-length build, so it must only run once instead of once per
+    read length.
     """
     input:
         kraken2_db = kraken2_dir + 'hash.k2d',
         rm_done = kraken2_dir + 'tmp_db_rm.done'
+    output:
+        krk = temp(kraken2_dir + 'database.kraken')
+    threads:
+        12
+    resources:
+        time = lambda wildcards, attempt: attempt ** 2 * 60 * 24,
+        n = lambda wildcards, attempt, threads: threads,
+        mem_gb_pt = lambda wildcards, attempt: attempt * 16
+    conda:
+        '../../envs/kraken2.yaml'
+    log:
+        log_dir + 'bracken_build_db_kraken/all.log'
+    benchmark:
+        benchmark_dir + 'bracken_build_db_kraken/all.txt'
+    shell:
+        """
+        # location of the kraken2 db files
+        DB=`dirname {input.kraken2_db}`
+        # same kraken2 classify command bracken-build.py itself would run;
+        # done once here so it isn't repeated (and doubled in memory use) per read length
+        kraken2 --db $DB --threads {threads} \
+          <( find -L $DB/library \( -name "*.fna" -o -name "*.fa" -o -name "*.fasta" \) -exec cat {{}} + ) \
+          > {output.krk} 2> {log}
+        """
+
+rule bracken_build:
+    """
+    Build braken database(s) from kraken2 database.
+    One database per user-selected read length, reusing the shared
+    database.kraken built by bracken_build_db_kraken.
+    """
+    input:
+        kraken2_db = kraken2_dir + 'hash.k2d',
+        db_kraken = kraken2_dir + 'database.kraken'
     output:
         krk = kraken2_dir + 'database{read_len}mers.kraken',
         krkd = kraken2_dir + 'database{read_len}mers.kmer_distrib'
@@ -29,10 +65,8 @@ rule bracken_build:
         """
         # location of the kraken2 db files
         DB=`dirname {input.kraken2_db}`
-        # removing existing files possibly created by bracken
-        TMP_FILE=$DB"/database.kraken"
-        rm -f $TMP_FILE
-        # running bracken 
+        # database.kraken already exists (built by bracken_build_db_kraken),
+        # so this just runs the cheap per-read-length kmer distribution step
         {params.exe} -t {threads} -d $DB \
           -k {params.kmer} -l {params.read_len} \
           2> {log} 1>&2

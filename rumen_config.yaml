@@ -1,0 +1,116 @@
+#-- email notifications of pipeline success/failure (use "Skip" to deactivate) --#
+email: None
+
+#-- databases to update --#
+# Replace "Create" with "Skip" to skip creation of any of these
+# Note that braken relies on the kraken2 database
+databases:
+  kraken2: Create
+  bracken: Create
+  genes: Skip    # "Skip" to skip adding genes from the new genomes to the "genes" database
+  humann3_bowtie2: Skip  # "Skip" to skip adding genes from the new genomes to the "humann3_bowtie2" database
+  humann3_diamond: Skip  # "Skip" to skip adding genes from the new genomes to the "humann3_diamond" database
+
+#-- Input --#
+#--- If just a set of gene sequences to add ---#
+# If you have nucleotide/amino-acid gene sequences formatted for humann
+# If translate = True, missing nuc or AA seqs will be (rev)translated from the other, else seqs not used
+new_genes:   
+  amino_acid: Skip # data/UniRef50/genome_reps_filtered.faa.gz
+  nucleotide: Skip # data/UniRef50/genome_reps_filtered.fna.gz
+  metadata: Skip # data/genome_reps_filtered.txt.gz
+  translate: False
+
+#--- If a set of genomes to add ---#
+# file listing samples and associated data
+samples_file: r232/rumen_catalogue/rumen_catalogue_samples.tsv
+
+## column names in samples table
+samples_col: 'accession'
+accession_col: 'accession'
+fasta_file_path_col: 'fasta_file_path'
+taxID_col: 'gtdb_taxid'          # or 'ncbi_species_taxid'
+taxonomy_col: 'gtdb_taxonomy'    # or 'ncbi_taxonomy' 
+
+# Saved databases that will be updated
+kraken2_db:
+  library:  r232/checkm50_no_rumen/kraken2/library
+  taxonomy: r232/checkm50_no_rumen/kraken2/taxonomy
+genes_db:
+  genes:
+    mmseqs_db:  tests/output/GTDBr95_n10/genes/genes_db.tar.gz
+    amino_acid: tests/output/GTDBr95_n10/genes/genome_reps_filtered.faa.gz
+    nucleotide: tests/output/GTDBr95_n10/genes/genome_reps_filtered.fna.gz
+    metadata:   tests/output/GTDBr95_n10/genes/genome_reps_filtered.txt.gz
+  cluster:
+    mmseqs_db:  tests/output/GTDBr95_n10/genes/cluster/clusters_db.tar.gz    
+humann_db:
+  query:
+    hits: tests/output/GTDBr95_n10/humann3/annotation_hits.gz
+  cluster:
+    reps: tests/output/GTDBr95_n10/genes/cluster/clusters_reps.faa.gz
+    membership: tests/output/GTDBr95_n10/genes/cluster/clusters_membership.tsv.gz
+
+#-- Output --#
+# output location
+output_dir: r232/check_m50_rumen_mags/
+
+# Name of UniRef clustering (uniref90 or uniref50)
+## "uniref90" highly recommended
+uniref_name: uniref50
+# Name of the humann3 diamond database to create
+## This must match naming allowed by humann3
+dmnd_name: uniref50_201901.dmnd   # UniRef90 is recommended
+# Index mapping UniRef90 clusters to UniRef50 (saves time vs re-annotating)
+## Skip if annotating with UniRef50
+cluster_idx: data/uniref50-90.pkl
+
+# temporary file directory (your username will be added automatically)
+tmp_dir: tmp/db_update_tmp/
+
+#-- if custom NCBI/GTDB taxdump files, "Skip" if standard NCBI taxdump --#
+# Used for kraken taxonomy & metaphlan
+names_dmp: r232/names.dmp
+nodes_dmp: r232/nodes.dmp
+
+#-- keep intermediate files required for re-creating DBs (eg., w/ more genomes) --#
+# If "True", the intermediate files are saved to `output_dir`
+# Else, the intermediate files are temporarily stored in `temp_folder`
+keep_intermediate: True
+
+#-- software parameters --#
+# `vsearch_per_genome` = per-genome gene clustering
+# for humann3, use either mmseqs or diamond (mmseqs gets priority if neither skipped)
+# for humann3::mmseqs_search::run, --num-iterations must be >=2
+params:
+  ionice: -c 3
+  kraken2:
+    # cap on the hash table size (bytes); use "Skip" for no cap (uses kraken2-build's full capacity estimate)
+    max_db_size: 200000000000
+  bracken:
+    build_kmer: 35
+    build_read_lens:
+      - 100
+      - 150
+  genes:
+    prodigal: ""
+    vsearch_per_genome: --id 0.97 --strand both --qmask none --fasta_width 0
+    mmseqs_cluster_update: --min-seq-id 0.9 -c 0.8 -s 4.0    
+  humann3:
+    batches: 2
+    filter_existing: --min-pident 0  # any existing genes w/ < cutoff with be re-queried
+    mmseqs_search:
+      db: data/UniRef90/uniref90       
+      index: -s 6
+      run: -e 1e-3 --max-accept 1 --max-seqs 100 --num-iterations 2 --start-sens 1 --sens-steps 3 -s 6
+    diamond:
+      db: Skip # data/uniref90_ec-filtered/uniref90_ec_filt_201901.dmnd
+      run: --evalue 1e-3 --query-cover 80 --id 90 --max-target-seqs 1 --block-size 4 --index-chunks 2
+    propagate_annotations: --min-cov 80 --min-pident 90
+
+#-- snakemake pipeline --#
+pipeline:
+  snakemake_folder: ./
+  script_folder: ./bin/scripts/
+  name: Struo2_db-update
+  config: update
